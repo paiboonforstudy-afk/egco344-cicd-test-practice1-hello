@@ -1,35 +1,36 @@
-name: Node.js CI
+name: Production Grade CI/CD
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+
 jobs:
-  build-and-test:
+  # JOB 1: สำหรับทดสอบโค้ดโดยเฉพาะ
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js
+    - name: Setup Node
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
-    - run: npm install
-    - run: echo "Tests would run here..."
+        cache: 'npm'
+    - run: npm ci
+    - run: npm test
 
-  deploy-docker:
-      needs: build-and-test
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
-        - name: Login to Docker Hub
-          uses: docker/login-action@v2
-          with:
-            username: ${{ secrets.DOCKERHUB_USERNAME }}
-            password: ${{ secrets.DOCKERHUB_TOKEN }}
-        - name: Build and push
-          uses: docker/build-push-action@v4
-          with:
-            push: true
-            tags: ${{ secrets.DOCKERHUB_USERNAME }}/node-hello-world:latest
-
+  # JOB 2: สำหรับ Build และ Push Image (จะรันก็ต่อเมื่อ Job test ผ่านเท่านั้น)
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Build and Push to Docker Hub
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/node-hello-world:latest
